@@ -2,120 +2,138 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Pi Memory Game</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto&display=swap">
   <style>
     body {
-      font-family: 'Roboto', sans-serif;
-      background: #f4f4f8;
+      font-family: sans-serif;
+      background-color: #f5f5f5;
       text-align: center;
       margin: 0;
       padding: 0;
     }
     h1 {
-      margin-top: 1rem;
-      color: #333;
+      padding-top: 20px;
+    }
+    .login-section {
+      margin: 20px;
     }
     #pi-login {
-      margin: 1rem auto;
-      padding: 0.5rem 1rem;
-      background: #ffcc00;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #8b5cf6;
+      color: white;
       border: none;
-      border-radius: 5px;
+      border-radius: 8px;
       cursor: pointer;
+    }
+    #username-display {
+      margin-top: 10px;
       font-weight: bold;
     }
-    #game-board {
+    .game-board {
       display: grid;
       grid-template-columns: repeat(4, 80px);
       gap: 10px;
       justify-content: center;
-      margin-top: 2rem;
+      padding: 20px;
     }
     .card {
       width: 80px;
       height: 80px;
-      background-color: #ccc;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      background-color: #ddd;
       font-size: 24px;
+      line-height: 80px;
       cursor: pointer;
+      border-radius: 8px;
       user-select: none;
     }
-    .flipped {
-      background-color: #4caf50;
-      color: white;
-    }
-    #status {
-      margin-top: 1rem;
-      font-size: 1.2rem;
+    .matched {
+      background-color: #6ee7b7;
+      cursor: default;
     }
   </style>
+  <!-- Pi SDK -->
+  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 </head>
 <body>
-  <h1>🧠 Pi Digits Memory Game</h1>
-  <button id="pi-login">Login with Pi</button>
-  <div id="status">Match the digits of Pi!</div>
-  <div id="game-board"></div>
+  <h1>Pi Memory Game</h1>
+  <div class="login-section">
+    <button id="pi-login">Login with Pi</button>
+    <div id="username-display"></div>
+  </div>
+  <div class="game-board" id="game-board"></div>
 
-  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
   <script>
-    // Pi Login
-    document.getElementById('pi-login').addEventListener('click', () => {
-      Pi.init({ version: "2.0" });
-      Pi.authenticate(["username"], function(authData) {
-        document.getElementById("status").textContent = `Welcome, @${authData.user.username}! Start matching digits!`;
-        document.getElementById("pi-login").style.display = "none";
-      }, function(error) {
-        alert("Pi Login failed: " + error);
-      });
-    });
+    const digits = "3141592653589793".split(""); // 8 unique pairs = 16 cards
+    let cards = [...digits, ...digits];
+    cards = cards.sort(() => 0.5 - Math.random());
 
-    // Memory Game Logic with digits of Pi
-    const piDigits = ['3','1','4','1','5','9','2','6'];
-    const deck = [...piDigits, ...piDigits].sort(() => Math.random() - 0.5);
-    const board = document.getElementById('game-board');
-    let firstCard = null;
-    let lock = false;
-    let matches = 0;
+    const board = document.getElementById("game-board");
+    let flippedCards = [];
+    let matchedIndexes = [];
 
-    deck.forEach((digit, index) => {
-      const card = document.createElement('div');
-      card.classList.add('card');
-      card.dataset.digit = digit;
-      card.dataset.index = index;
-      card.addEventListener('click', () => {
-        if (lock || card.classList.contains('flipped')) return;
-        card.textContent = digit;
-        card.classList.add('flipped');
-
-        if (!firstCard) {
-          firstCard = card;
+    function renderBoard() {
+      board.innerHTML = "";
+      cards.forEach((digit, index) => {
+        const card = document.createElement("div");
+        card.className = "card";
+        if (matchedIndexes.includes(index)) {
+          card.classList.add("matched");
+          card.innerText = digit;
+        } else if (flippedCards.includes(index)) {
+          card.innerText = digit;
         } else {
-          lock = true;
+          card.innerText = "";
+        }
+
+        card.addEventListener("click", () => handleCardClick(index));
+        board.appendChild(card);
+      });
+    }
+
+    function handleCardClick(index) {
+      if (flippedCards.length < 2 && !flippedCards.includes(index) && !matchedIndexes.includes(index)) {
+        flippedCards.push(index);
+        renderBoard();
+
+        if (flippedCards.length === 2) {
           setTimeout(() => {
-            if (card.dataset.digit === firstCard.dataset.digit) {
-              matches++;
-              if (matches === piDigits.length) {
-                document.getElementById('status').textContent = '🎉 You matched all Pi digits!';
-              }
-            } else {
-              card.classList.remove('flipped');
-              card.textContent = '';
-              firstCard.classList.remove('flipped');
-              firstCard.textContent = '';
+            const [i1, i2] = flippedCards;
+            if (cards[i1] === cards[i2]) {
+              matchedIndexes.push(i1, i2);
             }
-            firstCard = null;
-            lock = false;
+            flippedCards = [];
+            renderBoard();
+
+            if (matchedIndexes.length === cards.length) {
+              setTimeout(() => alert("🎉 You matched all digits of Pi!"), 200);
+            }
           }, 700);
         }
-      });
-      board.appendChild(card);
+      }
+    }
+
+    renderBoard();
+  </script>
+
+  <!-- Pi Login Script -->
+  <script>
+    Pi.init({ version: "2.0" });
+    const scopes = ['username'];
+
+    document.getElementById("pi-login").addEventListener("click", async () => {
+      try {
+        const result = await Pi.authenticate(scopes, onIncompletePaymentFound);
+        document.getElementById("username-display").innerText = "Welcome, " + result.user.username + "!";
+      } catch (error) {
+        alert("Login failed: " + error.message);
+      }
     });
+
+    function onIncompletePaymentFound(payment) {
+      console.log("Incomplete payment found", payment);
+    }
   </script>
 </body>
 </html>
-
