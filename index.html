@@ -4,136 +4,99 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Pi Memory Game</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      background-color: #f5f5f5;
-      text-align: center;
-      margin: 0;
-      padding: 0;
-    }
-    h1 {
-      padding-top: 20px;
-    }
-    .login-section {
-      margin: 20px;
-    }
-    #pi-login {
-      padding: 10px 20px;
-      font-size: 16px;
-      background-color: #8b5cf6;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-    #username-display {
-      margin-top: 10px;
-      font-weight: bold;
-    }
-    .game-board {
-      display: grid;
-      grid-template-columns: repeat(4, 80px);
-      gap: 10px;
-      justify-content: center;
-      padding: 20px;
-    }
-    .card {
-      width: 80px;
-      height: 80px;
-      background-color: #ddd;
-      font-size: 24px;
-      line-height: 80px;
-      cursor: pointer;
-      border-radius: 8px;
-      user-select: none;
-    }
-    .matched {
-      background-color: #6ee7b7;
-      cursor: default;
-    }
-  </style>
-  <!-- Pi SDK -->
+  <link rel="stylesheet" href="style.css"/>
   <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 </head>
 <body>
   <h1>Pi Memory Game</h1>
-  <div class="login-section">
-    <button id="pi-login">Login with Pi</button>
-    <div id="username-display"></div>
-  </div>
-  <div class="game-board" id="game-board"></div>
+  <p>Match the digits of Pi!</p>
+  <div class="game-board" id="gameBoard"></div>
+
+  <footer>
+    <p>
+      By playing, you agree to our
+      <a href="privacy-policy.html" target="_blank">Privacy Policy</a> and
+      <a href="terms-of-service.html" target="_blank">Terms of Service</a>.
+    </p>
+  </footer>
 
   <script>
-    const digits = "3141592653589793".split(""); // 8 unique pairs = 16 cards
-    let cards = [...digits, ...digits];
-    cards = cards.sort(() => 0.5 - Math.random());
-
-    const board = document.getElementById("game-board");
-    let flippedCards = [];
-    let matchedIndexes = [];
-
-    function renderBoard() {
-      board.innerHTML = "";
-      cards.forEach((digit, index) => {
-        const card = document.createElement("div");
-        card.className = "card";
-        if (matchedIndexes.includes(index)) {
-          card.classList.add("matched");
-          card.innerText = digit;
-        } else if (flippedCards.includes(index)) {
-          card.innerText = digit;
-        } else {
-          card.innerText = "";
-        }
-
-        card.addEventListener("click", () => handleCardClick(index));
-        board.appendChild(card);
-      });
-    }
-
-    function handleCardClick(index) {
-      if (flippedCards.length < 2 && !flippedCards.includes(index) && !matchedIndexes.includes(index)) {
-        flippedCards.push(index);
-        renderBoard();
-
-        if (flippedCards.length === 2) {
-          setTimeout(() => {
-            const [i1, i2] = flippedCards;
-            if (cards[i1] === cards[i2]) {
-              matchedIndexes.push(i1, i2);
-            }
-            flippedCards = [];
-            renderBoard();
-
-            if (matchedIndexes.length === cards.length) {
-              setTimeout(() => alert("🎉 You matched all digits of Pi!"), 200);
-            }
-          }, 700);
-        }
-      }
-    }
-
-    renderBoard();
-  </script>
-
-  <!-- Pi Login Script -->
-  <script>
-    Pi.init({ version: "2.0" });
-    const scopes = ['username'];
-
-    document.getElementById("pi-login").addEventListener("click", async () => {
-      try {
-        const result = await Pi.authenticate(scopes, onIncompletePaymentFound);
-        document.getElementById("username-display").innerText = "Welcome, " + result.user.username + "!";
-      } catch (error) {
-        alert("Login failed: " + error.message);
+    // Pi Network login
+    window.addEventListener("load", function () {
+      if (window.Pi) {
+        Pi.authenticate(["username"], function (user) {
+          console.log("Pi login successful:", user);
+          alert("Welcome, " + user.username + "!");
+        }, function (error) {
+          console.error("Pi login failed:", error);
+        });
+      } else {
+        console.warn("Pi SDK not found");
       }
     });
 
-    function onIncompletePaymentFound(payment) {
-      console.log("Incomplete payment found", payment);
+    // Game logic
+    const digitsOfPi = ['3', '1', '4', '1', '5', '9', '2', '6'];
+    const cards = [...digitsOfPi, ...digitsOfPi];
+    let flippedCards = [];
+    let matchedCards = [];
+
+    function shuffle(array) {
+      return array.sort(() => 0.5 - Math.random());
     }
+
+    function createCard(value) {
+      const card = document.createElement("div");
+      card.classList.add("card");
+      card.dataset.value = value;
+      card.textContent = "?";
+      card.addEventListener("click", () => flipCard(card));
+      return card;
+    }
+
+    function flipCard(card) {
+      if (
+        flippedCards.length < 2 &&
+        !flippedCards.includes(card) &&
+        !matchedCards.includes(card)
+      ) {
+        card.textContent = card.dataset.value;
+        flippedCards.push(card);
+
+        if (flippedCards.length === 2) {
+          checkMatch();
+        }
+      }
+    }
+
+    function checkMatch() {
+      const [card1, card2] = flippedCards;
+      if (card1.dataset.value === card2.dataset.value) {
+        matchedCards.push(card1, card2);
+        flippedCards = [];
+        if (matchedCards.length === cards.length) {
+          setTimeout(() => alert("🎉 You've matched all digits of Pi!"), 300);
+        }
+      } else {
+        setTimeout(() => {
+          card1.textContent = "?";
+          card2.textContent = "?";
+          flippedCards = [];
+        }, 1000);
+      }
+    }
+
+    function initGame() {
+      const gameBoard = document.getElementById("gameBoard");
+      gameBoard.innerHTML = "";
+      const shuffledCards = shuffle(cards);
+      shuffledCards.forEach((value) => {
+        const card = createCard(value);
+        gameBoard.appendChild(card);
+      });
+    }
+
+    initGame();
   </script>
 </body>
 </html>
